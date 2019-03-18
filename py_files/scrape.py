@@ -34,7 +34,7 @@ class webScraper():
         bot.navigate_to_network()
 
         # Scroll to the bottom of the page continu
-        bot.scroll_to_bottom(50)
+        bot.scroll_to_bottom(10)
         
         # Get the current page source of the current URL
         page_source = bot.get_page_source()
@@ -74,7 +74,12 @@ class webScraper():
         bot.login()
 
         # Go to each page
-        bot.go_to_pages(urls)
+        bot.add_friends(urls)
+
+
+    def test(self):
+        bot = self.bot
+        bot.mark_as_visited("https://www.linkedin.com/in/siddhanth-jayaraman-13a12326/", bot.open_database())
         
 
 
@@ -84,4 +89,6 @@ if __name__ == '__main__':
     new_scraper.scrape()
     new_scraper.query()
     new_scraper.connect()
+    # new_scraper.test()
+
 # print(new_scraper)

@@ -1,4 +1,5 @@
 from selenium import webdriver
+from selenium.webdriver.common.by import By
 import os
 import time 
 from bs4 import BeautifulSoup
@@ -188,8 +189,6 @@ class LinkedIn_Bot:
             SELECT * FROM people WHERE {}
         """.format(select_condition)
 
-        print(statement)
-
         try: 
             db_cursor = db_connection.cursor()
             db_cursor.execute(statement)
@@ -248,11 +247,86 @@ class LinkedIn_Bot:
 
         return formatted_urls
 
-    def go_to_pages(self, formatted_urls):
+    def add_friends(self, formatted_urls):
+
+        db_connection = self.open_database()
         
         for peoples_url in formatted_urls:
             self.navigate_to_url(peoples_url, random.uniform(3.5, 5.9))
+            self.connect_to_person()
+            self.mark_as_visited(peoples_url, db_connection)
+
+        db_connection.close()
+
+    def mark_as_visited(self, single_url, db_connection):
+
+        split_url = single_url.replace("/", " ").replace("-", " ").split()
         
+        if len(split_url) == 7:
+            ID = split_url[5]
+        elif len(split_url) == 6:
+            ID = split_url[5]
+        elif len(split_url) == 5:
+            ID = str(split_url[3]) + str(split_url[4])
+        elif len(split_url) == 4:
+            ID = split_url[3]
+
+        sql_update_command = """
+            UPDATE people
+            SET visited = '{}'
+            WHERE ID = '{}'
+        """.format(bool(True), str(ID))
+
+        person_not_connected = self.person_not_connected(db_connection, ID)
+
+        if person_not_connected:
+            try:
+                db_cursor = db_connection.cursor()
+                db_cursor.execute(sql_update_command)
+                db_connection.commit()
+            except DB_ERROR as e:
+                print(e)
+                return 
+
+    def person_not_connected(self, db_connection, ID):
+
+        sql_verify_command = """
+            SELECT * FROM people 
+            WHERE ID = '{}'
+        """.format(ID)
+
+        print(sql_verify_command)
+
+        try:
+            db_cursor = db_connection.cursor()
+            db_cursor.execute(sql_verify_command)
+
+            entries = db_cursor.fetchall()
+
+            for entry in entries:
+                if entry:
+                    return False 
+                else:
+                    return True 
+        except DB_ERROR as e:
+            print(e)
+            return 
+
+    def connect_to_person(self):
+
+        # Click the connect button
+        connect_button = self.browser.find_element_by_class_name("pv-s-profile-actions__label")
+        connect_button.click()
+
+        # Wait for browser to load
+        time.sleep(2)
+
+        # send_now_button = self.browser.find_element(By.CSS_SELECTOR('button[value="Send now"]'))
+        send_now_button = self.browser.find_element_by_xpath("//button[@value='Send now']")
+        if send_now_button:
+            send_now_button.click()
+
+
 
         
         
