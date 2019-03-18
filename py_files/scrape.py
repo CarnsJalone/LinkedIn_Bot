@@ -86,8 +86,8 @@ class webScraper():
 
 if __name__ == '__main__':
     new_scraper = webScraper(username, password)
-    new_scraper.scrape()
-    new_scraper.query()
+    # new_scraper.scrape()
+    # new_scraper.query()
     new_scraper.connect()
     # new_scraper.test()
 

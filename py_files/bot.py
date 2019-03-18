@@ -1,6 +1,5 @@
-from selenium import webdriver
-from selenium.webdriver.common.by import By
 import os
+import sys
 import time 
 from bs4 import BeautifulSoup
 from urllib.parse import urlparse
@@ -11,7 +10,17 @@ from sqlite3 import Error as DB_ERROR
 import random
 
 # Import chromedriver.exe
-chromedriver = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), r"webdriver\chromedriver.exe")
+platform = sys.platform
+
+if platform == "linux":
+    chromedriver = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "webdriver/linux/chromedriver.exe")
+    sys.path.append("/home/jarret/.local/lib/python3.6/site-packages/")
+elif platform == "windows":
+    chromedriver = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), r"webdriver\windows\chromedriver.exe")
+
+from selenium import webdriver
+from selenium.webdriver.common.by import By
+from selenium.common.exceptions import NoSuchElementException, WebDriverException
 
 class LinkedIn_Bot:
 
@@ -278,53 +287,72 @@ class LinkedIn_Bot:
         """.format(bool(True), str(ID))
 
         person_not_connected = self.person_not_connected(db_connection, ID)
-
+        
         if person_not_connected:
             try:
                 db_cursor = db_connection.cursor()
                 db_cursor.execute(sql_update_command)
+                print("Person with the ID {} has been marked as visited".format(ID))
                 db_connection.commit()
             except DB_ERROR as e:
                 print(e)
-                return 
+                pass
+            except Exception as e:
+                print(e)
+                pass
+        else:
+            print("Person already marked as visited.")
+
 
     def person_not_connected(self, db_connection, ID):
 
         sql_verify_command = """
             SELECT * FROM people 
             WHERE ID = '{}'
-        """.format(ID)
-
-        print(sql_verify_command)
+            AND visited = '{}'
+        """.format(ID, bool(True))
 
         try:
             db_cursor = db_connection.cursor()
             db_cursor.execute(sql_verify_command)
 
-            entries = db_cursor.fetchall()
+            connected_person = db_cursor.fetchall()
 
-            for entry in entries:
-                if entry:
-                    return False 
-                else:
-                    return True 
+            if connected_person:
+                print("Person with the ID {} shows as already visited.".format(ID))
+                return False
+            else:
+                return True 
+
         except DB_ERROR as e:
             print(e)
             return 
 
     def connect_to_person(self):
 
-        # Click the connect button
-        connect_button = self.browser.find_element_by_class_name("pv-s-profile-actions__label")
-        connect_button.click()
-
-        # Wait for browser to load
-        time.sleep(2)
-
-        # send_now_button = self.browser.find_element(By.CSS_SELECTOR('button[value="Send now"]'))
-        send_now_button = self.browser.find_element_by_xpath("//button[@value='Send now']")
-        if send_now_button:
+        try:
+            # Click the connect button
+            connect_button = self.browser.find_element_by_class_name("pv-s-profile-actions__label")
+            connect_button.click()
+            # Wait for browser to load
+            time.sleep(2)
+            # Click the 'Send now' button
+            send_now_button = self.browser.find_element_by_xpath("//button[text()='Send now']")
             send_now_button.click()
+            print("Person added")
+            return True 
+        except NoSuchElementException as e:
+            print(e)
+            print("An error arose... Bypassing Send Now button... Database to be updated.")
+            return False    
+        except WebDriverException as e:
+            print(e)
+            print("An error arose... Bypassing Send Now button... Database to be updated.")
+            return False
+        except Exception as e:
+            print(e)
+            print("An error arose... Bypassing Send Now button... Database to be updated.")
+            return False
 
 
 
