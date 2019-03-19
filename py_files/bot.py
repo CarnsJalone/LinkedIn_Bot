@@ -390,6 +390,7 @@ class LinkedIn_Bot:
         SEARCH_CRITERIA_TXT = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'txt/search_criteria.txt')
         
         matches = []
+        non_matches = []
 
         ignore_criteria = [
             "FCA", 

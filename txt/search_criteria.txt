@@ -1,4 +1,6 @@
+Acquisition
 Agile
+Analyst
 Apache
 Applications
 Architecture
@@ -40,6 +42,8 @@ Software
 Solutions
 SSL
 SQL
+Talent
+Talent Acquisition
 Team
 Tech
 Technologies
