@@ -18,7 +18,7 @@ class webScraper():
     def __repr__(self):
         return "This is a bad ass class"
 
-    def scrape(self, num_pages):
+    def discover_new_people(self, num_pages):
         """This function goes into the 'Network' tab on linkedIn and logs people into the database for future add"""
 
         bot = self.bot
@@ -54,38 +54,45 @@ class webScraper():
         bot.close_browser()
 
 
-    def connect(self):
+    def get_professions(self):
         bot = self.bot
-        urls = bot.format_stored_people(bot.find_unvisited())
 
-        # Open up linked in
+        univisited_people = bot.find_unvisited()
+
+        urls_and_ids = bot.format_stored_people(univisited_people)
+
+        # # Open up linked in
         bot.create_browser()
 
-        # To to Linkin Homepage
+        # # To to Linkin Homepage
         bot.navigate_to_url("https://www.linkedin.com", 2)
 
-        # Enter credentials to log on 
+        # # Enter credentials to log on 
         bot.login()
 
-        # Go to each page
-        bot.add_friends(urls)
+        # # Go to each page
+        bot.add_friends(urls_and_ids, add_mode=False)
 
-        # Close the browser
+        # # Close the browser
         bot.close_browser()
 
     def update_matches(self):
         bot = self.bot
 
+        db_connection = bot.open_database()
+
         # Gather people who's job description has been updated
         matches = bot.find_updated_job_descriptions()
+       
         for match in matches:
-            print(match)
+            ID = match[0][0]
+            try:
+                # Update DB with updated inquiry
+                bot.update_database(db_connection, "SET job_potential = 'True'", "WHERE ID = '{}'".format(ID))
+            except Exception as e:
+                print(e)
 
-        # # Update the database with those who fit the criteria
-        # bot.update_db_with_matches(matches, True)
-
-        # # Update the database with those who don't fit the criteria
-        # bot.update_db_with_matches(non_matches, False)
+        db_connection.close()
 
     def reach_out(self):
         bot = self.bot
@@ -109,9 +116,9 @@ class webScraper():
 
 if __name__ == '__main__':
     new_scraper = webScraper(username, password)
-    # new_scraper.scrape(50)
-    # new_scraper.connect()
-    new_scraper.update_matches()
+    new_scraper.discover_new_people(50)
+    new_scraper.get_profile_description()
+    # new_scraper.update_matches()
     # new_scraper.reach_out()
     # new_scraper.test()
 

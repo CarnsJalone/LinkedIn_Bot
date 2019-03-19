@@ -15,7 +15,7 @@ platform = sys.platform
 if platform == "linux":
     chromedriver = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "webdriver/linux/chromedriver.exe")
     sys.path.append("/home/jarret/.local/lib/python3.6/site-packages/")
-elif platform == "windows":
+elif platform == "win32":
     chromedriver = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), r"webdriver\windows\chromedriver.exe")
 
 from selenium import webdriver
@@ -244,23 +244,36 @@ class LinkedIn_Bot:
 
     def format_stored_people(self, unvisited_people):
 
-        urls = []
+        people = []
 
         for person in unvisited_people:
             person_url = person[5]
-            urls.append(person_url)
+            person_id = person[0]
 
-        return urls
+            person = {
+                "ID" : person_id,
+                "URL" : person_url
+            }
 
-    def add_friends(self, formatted_urls):
+            people.append(person)
+
+        return people
+
+    def add_friends(self, urls_and_ids, add_mode=True):
 
         db_connection = self.open_database()
         
-        for peoples_url in formatted_urls:
-            self.navigate_to_url(peoples_url, random.uniform(3.5, 5.9))
+        for url_and_id in urls_and_ids:
+            url = url_and_id["URL"]
+            ID = url_and_id["ID"]
+            self.navigate_to_url(url, random.uniform(3.5, 5.9))
             job_description = self.acquire_job_description()
-            self.connect_to_person()
-            self.update_person(peoples_url, db_connection, job_description)
+            if add_mode:
+                self.connect_to_person()
+                self.update_person(url, db_connection, job_description)
+            else:
+                self.update_database(db_connection, "SET position_desc = '{}'".format(job_description), "WHERE ID = '{}'".format(ID))
+                print("Individual with the ID {} job description updated to: {}".format(ID, job_description))
 
         db_connection.close()
 
@@ -405,7 +418,8 @@ class LinkedIn_Bot:
             "Logistics", 
             "MLM", 
             "Quality",
-            "Retail"
+            "Retail", 
+            "Student"
         ]
         
         match_criteria = open(SEARCH_CRITERIA_TXT, 'r')
@@ -430,31 +444,6 @@ class LinkedIn_Bot:
 
         match_criteria.close()
         return matches
-
-    def update_db_with_matches(self, matches):
-
-        try:
-            db_connection = self.open_database()
-            db_cursor = db_connection.cursor()
-        
-            for person in matches:
-                ID = person[0][0]
-
-                sql_update_command = """
-                    UPDATE people
-                    SET job_potential = '{}'
-                    WHERE ID = '{}'
-                """.format(bool(True), str(ID))
-
-                db_cursor.execute(sql_update_command)
-                db_connection.commit()
-            
-        except DB_ERROR as e:
-            print(e)
-        except Exception as e:
-            print(e)
-        finally:
-            db_connection.close()
 
     def message_candidates(self):
 
