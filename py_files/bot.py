@@ -100,32 +100,27 @@ class LinkedIn_Bot:
                     last_name = split_person_object[2]
                     certification = split_person_object[3]
                     ID = split_person_object[4]
-                    visited = False
                 if len(split_person_object) == 4:
                     first_name = split_person_object[1]
                     last_name = split_person_object[2]
                     certification = "None"
                     ID = split_person_object[3]
-                    visited = False
                 elif len(split_person_object) == 3:
                     first_name = split_person_object[1]
                     last_name = split_person_object[2]
                     certification = "None"
                     ID = str(split_person_object[1]) + str(split_person_object[2])
-                    visited = False
                 elif len(split_person_object) == 2:
                     first_name = split_person_object[1]
                     last_name = "None"
                     certification = "None"
-                    ID = split_person_object[1]
-                    visited = False
 
                 person = {
                     'ID' : ID,
                     'first_name' : first_name,
                     'last_name' : last_name,
                     'certification' : certification, 
-                    'visited' : visited, 
+                    'added' : False, 
                     'URL' : person_url, 
                     'position_desc' : 'None',
                     'job_potential' : False,
@@ -168,7 +163,7 @@ class LinkedIn_Bot:
             first_name text NOT NULL,
             last_name text NOT NULL, 
             certification text, 
-            visited boolean, 
+            added boolean, 
             URL text NOT NULL, 
             position_desc text,
             job_potential boolean,
@@ -188,7 +183,7 @@ class LinkedIn_Bot:
 
             for person in people_list:
                 columns = ', '.join(person.keys())
-                values = "'{}', '{}', '{}', '{}', '{}', '{}', '{}', '{}', '{}'".format(str(person["ID"]), str(person["first_name"]), str(person["last_name"]), str(person["certification"]), person["visited"], person["URL"], person["position_desc"], person["job_potential"], person["messaged"])
+                values = "'{}', '{}', '{}', '{}', '{}', '{}', '{}', '{}', '{}'".format(str(person["ID"]), str(person["first_name"]), str(person["last_name"]), str(person["certification"]), person["added"], person["URL"], person["position_desc"], person["job_potential"], person["messaged"])
                 # values = ''
                 command = 'INSERT INTO people ({}) VALUES({})'.format(columns, values)
 
@@ -226,27 +221,22 @@ class LinkedIn_Bot:
             print(e)
             return 
 
-        finally:
-            db_connection.close()
-
-    def find_unvisited(self):
-
-        db_connection = self.open_database()
+    def find_not_added(self, db_connection):
         
         try:
-            unvisited = self.query_db(db_connection, select_condition="visited='False' AND messaged <> 'True'" )
-            return unvisited
+            not_added = self.query_db(db_connection, select_condition="added='False' AND messaged <> 'True'" )
+            return not_added
         except DB_ERROR as e:
             print(e)
             return 
-        finally:
-            db_connection.close()
 
-    def format_stored_people(self, unvisited_people):
+    def format_stored_people(self, people_not_yet_added):
 
         people = []
 
-        for person in unvisited_people:
+        random.shuffle(people_not_yet_added)
+
+        for person in people_not_yet_added:
             person_url = person[5]
             person_id = person[0]
 
@@ -259,27 +249,24 @@ class LinkedIn_Bot:
 
         return people
 
-    def add_friends(self, urls_and_ids, add_mode=True):
-
-        db_connection = self.open_database()
+    def add_friends(self, urls_and_ids, db_connection, add_mode=True):
         
         for url_and_id in urls_and_ids:
             url = url_and_id["URL"]
             ID = url_and_id["ID"]
             self.navigate_to_url(url, random.uniform(3.5, 5.9))
             job_description = self.acquire_job_description()
+            first_name, last_name = self.acquire_full_name()
             if add_mode:
                 self.connect_to_person()
                 self.update_person(url, db_connection, job_description)
             else:
-                self.update_database(db_connection, "SET position_desc = '{}'".format(job_description), "WHERE ID = '{}'".format(ID))
-                print("Individual with the ID {} job description updated to: {}".format(ID, job_description))
+                self.update_database(db_connection, "SET position_desc = '{}', first_name = '{}', last_name = '{}'".format(job_description, first_name, last_name), "WHERE ID = '{}'".format(ID))
+                print("{} {} with the ID {}'s job description updated to: {}".format(first_name, last_name, ID, job_description))
 
-        db_connection.close()
+    def update_person(self, candidate_url, db_connection, job_description):
 
-    def update_person(self, single_url, db_connection, job_description):
-
-        split_url = single_url.replace("/", " ").replace("-", " ").split()
+        split_url = candidate_url.replace("/", " ").replace("-", " ").split()
         
         if len(split_url) == 7:
             ID = split_url[5]
@@ -290,57 +277,20 @@ class LinkedIn_Bot:
         elif len(split_url) == 4:
             ID = split_url[3]
 
-        sql_update_command = """
-            UPDATE people
-            SET visited = '{}', 
-            position_desc = '{}'
-            WHERE ID = '{}'
-        """.format(bool(True), str(job_description), str(ID))
-
-        print(sql_update_command)
-
-        person_not_connected = self.person_not_connected(db_connection, ID)
+        # Returns a DB entry of one person that hasn't been added yet
+        # And hasn't been messaged yet
+        person_not_connected = self.query_db(db_connection, select_condition="WHERE ID = '{}' AND added <> 'True' AND messaged <> 'True'".format(ID))
         
         if person_not_connected:
-            try:
-                db_cursor = db_connection.cursor()
-                db_cursor.execute(sql_update_command)
-                print("Person with the ID {} has been marked as visited and their job description has been updated.".format(ID))
-                db_connection.commit()
-            except DB_ERROR as e:
-                print(e)
-                pass
-            except Exception as e:
-                print(e)
-                pass
+            # Mark person as not connected in the DB
+            self.update_database(db_connection, sql_set_command="SET added = 'True'", sql_where_command="WHERE ID = '{}'".format(ID))
+
         else:
-            print("Person already marked as visited.")
-
-
-    def person_not_connected(self, db_connection, ID):
-
-        sql_verify_command = """
-            SELECT * FROM people 
-            WHERE ID = '{}'
-            AND visited = 'True
-            AND messaged <> 'True'
-        """.format(ID)
-
-        try:
-            db_cursor = db_connection.cursor()
-            db_cursor.execute(sql_verify_command)
-
-            connected_person = db_cursor.fetchall()
-
-            if connected_person:
-                print("Person with the ID {} shows as already visited.".format(ID))
-                return False
-            else:
-                return True 
-
-        except DB_ERROR as e:
-            print(e)
-            return 
+            # No entries were returned from the DB which means that 
+            # 1) Entry doesn't exist
+            # 2) Entry has been added already
+            # 3) Entry has been messaged already
+            print("Person with the ID {} has already been added".format(ID))
 
     def connect_to_person(self):
 
@@ -377,37 +327,73 @@ class LinkedIn_Bot:
         formatted_js = re.sub("\s\s+", "", job_description)
         return formatted_js
 
+    def acquire_full_name(self):
 
-    def find_updated_job_descriptions(self):
-        db_connection = self.open_database()
+        try:
+            current_page = self.get_page_source()
+            full_name_with_tags = current_page.find("h1", {"class" : "pv-top-card-section__name"})
+            full_name = full_name_with_tags.text
+            full_name = str(full_name)
+            full_name = full_name.replace("\n", "")
+            full_name = re.sub("\s\s+", "", full_name)
+            split_name = full_name.split(" ")
+            if len(split_name) == 1:
+                first_name = split_name[0]
+                last_name = 'None'
+            if len(split_name) == 2:
+                first_name = split_name[0]
+                last_name = split_name[1]
+            elif len(split_name) > 2:
+                first_name = split_name[0]
+                last_name = split_name[len(split_name) - 1]
+
+        except AttributeError as e:
+            print(e)
+            first_name = "None"
+            last_name = "None"
+        except Exception as e:
+            print(e)
+            first_name = "None"
+            last_name = "None"
+
+        return first_name, last_name
+
+
+    def find_updated_job_descriptions(self, db_connection):
 
         matches = []
 
+        # Find people who have a job description that haven't been messaged yet
         sql_job_description_command = "position_desc <> 'None' AND messaged <> 'True'"
 
+        # Execute search in DB
         people_with_job_descriptions = self.query_db(db_connection, select_condition=sql_job_description_command)
 
         for person in people_with_job_descriptions:
+
+            # Grab the 6th index of the resultant people from the db
             job_description = person[6]
 
+            # Compare the resultant people against the text file for job keywords
+            # and compare against the list of elimination keywords
             each_match = self.compare_desc_against_criteria(job_description, person)
 
             if each_match:
                 matches.append(each_match)
-                # print(len(matches))
 
         return matches
 
 
     def compare_desc_against_criteria(self, job_description, person):
+
         SEARCH_CRITERIA_TXT = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'txt/search_criteria.txt')
         
         matches = []
-        non_matches = []
 
         ignore_criteria = [
             "FCA", 
             "FCA Fiat Chrysler Automobiles",
+            "Jeep",
             "Operations", 
             "DHL", 
             "Chrysler", 
@@ -419,28 +405,49 @@ class LinkedIn_Bot:
             "MLM", 
             "Quality",
             "Retail", 
-            "Student"
+            "Student", 
+            "Clerical", 
+            "Intern", 
+            "Sales"
         ]
         
+        # Open the text file where I have the keywords defined
         match_criteria = open(SEARCH_CRITERIA_TXT, 'r')
 
         job_description = str(job_description)
-        # print(type(job_description))
         
         for match_description in match_criteria:
+
+            # Format the text file so we can iterate properly
             match_description = match_description.strip()
             match_description = match_description.replace(" ", "")
             match_description = str(match_description)
+
             if match_description:
+
+                # Read in the list of keywords that we want to ignore
                 for ignore_description in ignore_criteria:
+
+                    # Format them so we can work with them
                     ignore_description = ignore_description.replace(" ", "")
                     ignore_description = str(ignore_description)
+
+                    # If the target keyword is in their job description
                     if match_description in job_description:
+
+                        # If the name triggers the list of words we want to avoid
                         if ignore_description in job_description:
-                            return
+
+                            # throw it out
+                            return 
+
                         else:
+
+                            # If we haven't already added it, add it
                             if person not in matches:
-                                matches.append(person)
+
+                                if person:
+                                    matches.append(person)
 
         match_criteria.close()
         return matches
@@ -475,11 +482,11 @@ class LinkedIn_Bot:
 
         db_connection.close()
 
-    def format_message(self, first_name):
+    def message_with_subject(self, first_name):
 
         first_name = first_name.title()
 
-        subject = "Hi {}!".format(first_name)
+        subject = "Hi {}".format(first_name)
 
         message = """My name is Jarret Laberdee, I'm an aspiring software developer looking for connections here, on LinkedIn. Sorry for the intrusive message but 
         your profile stuck out to me.  
@@ -492,7 +499,7 @@ class LinkedIn_Bot:
 
         return subject, message
 
-    def errored_format_message(self, first_name):
+    def message_no_subject(self, first_name):
 
         first_name = first_name.title()
 
@@ -520,32 +527,75 @@ class LinkedIn_Bot:
         time.sleep(2)
 
         current_url = self.browser.current_url
+
         if premium_url in current_url:
             print("Messaging {} {} with the ID {} has been forwarded to premium account URL, skipping to next candidate...".format(first_name, last_name, ID))
             return 
         else:
             
             time.sleep(1)
+
+            # If there's no issue with the subject form, return a tuple from the format message function
+            subject, message = self.message_with_subject(first_name)
             
+            # Begin message with a subject line
+
             try:
                 # Type the subject to the candidate
                 message_form_subject = self.browser.find_element_by_class_name("msg-form__subject")
-                # If there's no issue with the subject form, return a tuple from the format message function
-                subject, message = self.format_message(first_name)
                 message_form_subject.send_keys(subject)
+
             except NoSuchElementException as e:
+
+                # Begin message with no subject line
+
+                print(e + "\nExecuting message with no subject function...\n")
+                
                 # If there's an issue with the subject form ie it's not there, returns a single string from the errored format
-                message = self.errored_format_message(first_name)
-                print(e)
-                pass
+                message = self.message_no_subject(first_name)
+
+                try:
+                    # Type the message to the candidate
+                    message_form_message = self.browser.find_element_by_class_name("msg-form__contenteditable")
+                    message_form_message.send_keys(message)
+                    print("Sending message to {} {} with the ID {}.".format(first_name, last_name, ID))
+                
+                except NoSuchElementException as e:
+                    print(e + "\n")
+                    pass
+                
+                except WebDriverException as e:
+                    print(e + "\n")
+                    pass
+                
+                except Exception as e:
+                    print(e + "\n")
+                    pass
+
+                try:
+                    
+                    # Click the submit button
+                    message_form_submit_button = self.browser.find_element_by_class_name("msg-form__send-button")
+                    message_form_submit_button.click()
+                
+                except NoSuchElementException as e:
+                    print(e)
+                    pass
+                
+                except WebDriverException as e:
+                    print(e)
+                    pass
+                
+                except Exception as e:
+                    print(e + "\n")
+
             except WebDriverException as e:
-                message = self.errored_format_message(first_name)
-                print(e)
-                pass
+                print(e + "\n")
+                return 
+            
             except Exception as e:
-                message = self.errored_format_message(first_name)
-                print(e)
-                pass
+                print(e + "\n")
+                return 
 
             try:
                 # Type the message to the candidate

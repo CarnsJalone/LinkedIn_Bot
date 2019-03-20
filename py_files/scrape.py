@@ -16,7 +16,7 @@ class webScraper():
         self.bot = LinkedIn_Bot(username, password)
 
     def __repr__(self):
-        return "This is a bad ass class"
+        return "Bot Created for the purpose of extending one's social web."
 
     def discover_new_people(self, num_pages):
         """This function goes into the 'Network' tab on linkedIn and logs people into the database for future add"""
@@ -54,41 +54,63 @@ class webScraper():
         bot.close_browser()
 
 
-    def get_professions(self):
-        bot = self.bot
+    def get_personalized_information(self):
+        """This function iterates through all the entries in the 
+        database and updates the 'Job Description' field by scraping 
+        their LinkedIn page"""
 
-        univisited_people = bot.find_unvisited()
-
-        urls_and_ids = bot.format_stored_people(univisited_people)
-
-        # # Open up linked in
-        bot.create_browser()
-
-        # # To to Linkin Homepage
-        bot.navigate_to_url("https://www.linkedin.com", 2)
-
-        # # Enter credentials to log on 
-        bot.login()
-
-        # # Go to each page
-        bot.add_friends(urls_and_ids, add_mode=False)
-
-        # # Close the browser
-        bot.close_browser()
-
-    def update_matches(self):
         bot = self.bot
 
         db_connection = bot.open_database()
 
+        # Find people who are in the database but have a job description
+        # Marked as 'None'
+        people_not_yet_added = bot.find_not_added(db_connection)
+
+        # Grabs the urls and IDs for everyone who has 'None' as a 
+        # Job description in the DB
+        urls_and_ids = bot.format_stored_people(people_not_yet_added)
+
+        # Open up Chrome
+        bot.create_browser()
+
+        # Navigate to Linkin Homepage
+        bot.navigate_to_url("https://www.linkedin.com", 2)
+
+        # Enter credentials to log on 
+        bot.login()
+
+        # Go to each page
+        # Once there, grabs the job description that shows in each 
+        # Candidate's profile, then logs into the database
+        bot.add_friends(urls_and_ids, db_connection, add_mode=False)
+
+        db_connection.close()
+
+        # Close the browser
+        bot.close_browser()
+
+    def update_matches(self):
+        """This function updates the 'Job Potential' flag in the 
+        database by comparing each person's job description against 
+        a list of predefined target words in the /txt directory 
+        """
+        bot = self.bot
+
+        # Open DB to execute the update command
+        db_connection = bot.open_database()
+
         # Gather people who's job description has been updated
-        matches = bot.find_updated_job_descriptions()
+        matches = bot.find_updated_job_descriptions(db_connection)
+
+        # Erase the updated criteria so we can expand the candidates
+        bot.update_database(db_connection, sql_set_command="SET job_potential = 'False'", sql_where_command="WHERE job_potential = 'True'")
        
         for match in matches:
             ID = match[0][0]
             try:
                 # Update DB with updated inquiry
-                bot.update_database(db_connection, "SET job_potential = 'True'", "WHERE ID = '{}'".format(ID))
+                bot.update_database(db_connection, sql_set_command="SET job_potential = 'True'", sql_where_command="WHERE ID = '{}'".format(ID))
             except Exception as e:
                 print(e)
 
@@ -115,10 +137,11 @@ class webScraper():
 
 
 if __name__ == '__main__':
-    new_scraper = webScraper(username, password)
-    new_scraper.discover_new_people(50)
-    new_scraper.get_profile_description()
-    # new_scraper.update_matches()
+    # scrape_tool = webScraper(username, password)
+    scrape_tool = webScraper("jarret.test@gmail.com", "Jmoney25")
+    scrape_tool.discover_new_people(100)
+    scrape_tool.get_personalized_information()
+    # scrape_tool.update_matches()
     # new_scraper.reach_out()
     # new_scraper.test()
 

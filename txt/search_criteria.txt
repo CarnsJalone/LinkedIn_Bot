@@ -14,7 +14,10 @@ Collaborate
 Concept
 CSS
 Data
+Database
 Design
+Designer
+Developer
 Development
 Engineering
 Environment
@@ -26,6 +29,7 @@ Java
 Javascript
 Knowledge
 Machine
+Manager
 Mobile
 MongoDB
 Network
@@ -36,8 +40,13 @@ Objective-C
 PERL
 PHP
 PostgreSQL
+Program
+Programming
+Programmer
 Projects
 Python
+Security
+Site
 Software
 Solutions
 SSL
@@ -51,5 +60,6 @@ Testing
 Tools
 UNIX
 Web
+Website
 VBA
 VBS
