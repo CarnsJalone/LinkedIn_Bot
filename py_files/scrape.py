@@ -54,7 +54,7 @@ class webScraper():
         bot.close_browser()
 
 
-    def get_personalized_information(self):
+    def get_personalized_information(self, num_profiles, add_mode):
         """This function iterates through all the entries in the 
         database and updates the 'Job Description' field by scraping 
         their LinkedIn page"""
@@ -83,7 +83,7 @@ class webScraper():
         # Go to each page
         # Once there, grabs the job description that shows in each 
         # Candidate's profile, then logs into the database
-        bot.add_friends(urls_and_ids, db_connection, add_mode=False)
+        bot.add_friends(urls_and_ids, db_connection, num_profiles, add_mode=add_mode)
 
         db_connection.close()
 
@@ -111,21 +111,35 @@ class webScraper():
             try:
                 # Update DB with updated inquiry
                 bot.update_database(db_connection, sql_set_command="SET job_potential = 'True'", sql_where_command="WHERE ID = '{}'".format(ID))
+                print("Person with the ID {} has been marked as a potential candidate.".format(ID))
             except Exception as e:
                 print(e)
 
         db_connection.close()
 
-    def reach_out(self):
+    def message_candidates(self):
         bot = self.bot
 
+        # Create a connection
+        db_connection = bot.open_database()
+
+        # Open the browser
         bot.create_browser()
 
+        # Go to LinkedIn homepage
         bot.navigate_to_url("https://www.linkedin.com", 2)
 
+        # Login
         bot.login()
 
-        bot.message_candidates()
+        # Return an array of candidates who have not yet been messaged 
+        # And match our predefined list of search terminology
+        matching_candidates = bot.get_matching_candidates(db_connection)
+
+        # Message each candidate
+        bot.message_candidates(matching_candidates)
+
+        db_connection.close()
 
         bot.close_browser()
 
@@ -138,10 +152,11 @@ class webScraper():
 
 if __name__ == '__main__':
     # scrape_tool = webScraper(username, password)
-    scrape_tool = webScraper("jarret.test@gmail.com", "Jmoney25")
-    scrape_tool.discover_new_people(100)
-    scrape_tool.get_personalized_information()
+    scrape_tool = webScraper(username, password)
+    # scrape_tool.discover_new_people(20)
+    # scrape_tool.get_personalized_information(num_profiles=5, add_mode=False)
     # scrape_tool.update_matches()
+    scrape_tool.get_personalized_information(num_profiles=5, add_mode=True)
     # new_scraper.reach_out()
     # new_scraper.test()
 

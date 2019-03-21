@@ -249,20 +249,24 @@ class LinkedIn_Bot:
 
         return people
 
-    def add_friends(self, urls_and_ids, db_connection, add_mode=True):
+    def add_friends(self, urls_and_ids, db_connection, num_profiles, add_mode):
         
-        for url_and_id in urls_and_ids:
-            url = url_and_id["URL"]
-            ID = url_and_id["ID"]
-            self.navigate_to_url(url, random.uniform(3.5, 5.9))
-            job_description = self.acquire_job_description()
-            first_name, last_name = self.acquire_full_name()
-            if add_mode:
-                self.connect_to_person()
-                self.update_person(url, db_connection, job_description)
-            else:
-                self.update_database(db_connection, "SET position_desc = '{}', first_name = '{}', last_name = '{}'".format(job_description, first_name, last_name), "WHERE ID = '{}'".format(ID))
-                print("{} {} with the ID {}'s job description updated to: {}".format(first_name, last_name, ID, job_description))
+        profiles_visited = 0
+
+        while profiles_visited < num_profiles:
+            for url_and_id in urls_and_ids:
+                url = url_and_id["URL"]
+                ID = url_and_id["ID"]
+                self.navigate_to_url(url, random.uniform(3.5, 5.9))
+                job_description = self.acquire_job_description()
+                first_name, last_name = self.acquire_full_name()
+                if add_mode:
+                    self.connect_to_person()
+                    self.update_person(url, db_connection, job_description)
+                else:
+                    self.update_database(db_connection, "SET position_desc = '{}', first_name = '{}', last_name = '{}'".format(job_description, first_name, last_name), "WHERE ID = '{}'".format(ID))
+                    print("{} {} with the ID {}'s job description updated to: {}".format(first_name, last_name, ID, job_description))
+                profiles_visited += 1
 
     def update_person(self, candidate_url, db_connection, job_description):
 
@@ -452,15 +456,22 @@ class LinkedIn_Bot:
         match_criteria.close()
         return matches
 
-    def message_candidates(self):
-
-        db_connection = self.open_database()
+    def get_matching_candidates(self, db_connection):
 
         candidates = []
 
-        sql_candidates = "job_potential = 'True' AND messaged <> 'True'"
+        sql_search_command = "WHERE job_potential = 'True' AND messaged = 'False'"
 
-        candidates = self.query_db(db_connection, sql_candidates)
+        matching_candidates = self.query_db(db_connection, select_condition=sql_search_command)
+
+        for candidate in matching_candidates:
+            if candidate:
+                candidates.append(candidate)
+
+        return candidate
+
+
+    def message_candidates(self, candidates):
 
         for candidate in candidates:
             ID = candidate[0]
@@ -479,8 +490,6 @@ class LinkedIn_Bot:
                     print("Connection Request is pending for {} {} with the ID {}. Proceeding to the next candidate".format(first_name, last_name, ID))
                 else:
                     print("Another issue arose, proceeding to the next candidate")
-
-        db_connection.close()
 
     def message_with_subject(self, first_name):
 
